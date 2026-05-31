@@ -101,7 +101,7 @@ export function Header({ onMenuToggle }: HeaderProps = {}) {
               </div>
 
               {/* API Library */}
-              <Link to="/extensions/api" className="hidden md:flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors">
+              <Link to="/api-docs" className="hidden md:flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors">
                 <Code className="w-4 h-4 text-foreground" />
                 <span className="text-sm font-medium text-foreground hidden lg:inline">API Library</span>
               </Link>

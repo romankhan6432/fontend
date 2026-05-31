@@ -683,7 +683,7 @@ function CryptomusDepositTab() {
               If you experience any issues with your deposit, contact our support team.
             </p>
             <Link
-              to="/dashboard/support"
+              to="/contact"
               className="text-sm text-primary font-medium hover:underline flex items-center gap-1"
             >
               Contact Support

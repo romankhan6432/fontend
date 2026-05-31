@@ -61,6 +61,8 @@ const ApiDocsPage = lazy(() => import('@/pages/api-docs/page'))
 const CookiesPage = lazy(() => import('@/pages/cookies/page'))
 const PrivacyPage = lazy(() => import('@/pages/privacy/page'))
 const TermsPage = lazy(() => import('@/pages/terms/page'))
+const ContactPage = lazy(() => import('@/pages/contact/page'))
+const RefundPage = lazy(() => import('@/pages/refund/page'))
 const ProfilePage = lazy(() => import('@/pages/profile/page'))
 const ForgotPasswordAltPage = lazy(() => import('@/pages/forgot-password/page'))
 const ResetPasswordPage = lazy(() => import('@/pages/reset-password/page'))
@@ -141,6 +143,8 @@ export default function App() {
         <Route path="/cookies" element={<CookiesPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/refund" element={<RefundPage />} />
         <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
 
         {/* 404 */}
