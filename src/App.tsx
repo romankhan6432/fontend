@@ -30,10 +30,8 @@ const AdminAnalytics = lazy(() => import('@/pages/admin/analytics/page'))
 const AdminSolutions = lazy(() => import('@/pages/admin/solutions/page'))
 const AdminPackages = lazy(() => import('@/pages/admin/packages/page'))
 const AdminExtensions = lazy(() => import('@/pages/admin/extensions/page'))
-const AdminWallet = lazy(() => import('@/pages/admin/wallet/page'))
-const AdminWallets = lazy(() => import('@/pages/admin/wallets/page'))
 const AdminCrypto = lazy(() => import('@/pages/admin/crypto/page'))
-const AdminDepositAddresses = lazy(() => import('@/pages/admin/deposit-addresses/page'))
+const AdminOrders = lazy(() => import('@/pages/admin/orders/page'))
 const AdminTopupHistory = lazy(() => import('@/pages/admin/topup-history/page'))
 const AdminHistory = lazy(() => import('@/pages/admin/history/page'))
 const AdminCacheControl = lazy(() => import('@/pages/admin/cache-control/page'))
@@ -111,10 +109,8 @@ export default function App() {
           <Route path="solutions" element={<AdminSolutions />} />
           <Route path="packages" element={<AdminPackages />} />
           <Route path="extensions" element={<AdminExtensions />} />
-          <Route path="wallet" element={<AdminWallet />} />
-          <Route path="wallets" element={<AdminWallets />} />
           <Route path="crypto" element={<AdminCrypto />} />
-          <Route path="deposit-addresses" element={<AdminDepositAddresses />} />
+          <Route path="orders" element={<AdminOrders />} />
           <Route path="topup-history" element={<AdminTopupHistory />} />
           <Route path="history" element={<AdminHistory />} />
           <Route path="cache-control" element={<AdminCacheControl />} />

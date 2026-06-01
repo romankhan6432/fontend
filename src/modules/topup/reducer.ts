@@ -53,7 +53,13 @@ export interface TopupState {
     cryptomusCreating: boolean
     cryptomusUrl: string | null
     cryptomusInvoiceId: string | null
+    cryptomusWalletAddress: string | null
+    cryptomusNetwork: string | null
+    cryptomusPaymentAmount: number | null
     cryptomusError: string | null
+
+    cryptomusStatus: string | null
+    cryptomusStatusData: any
 }
 
 const initialState: TopupState = {
@@ -73,7 +79,13 @@ const initialState: TopupState = {
     cryptomusCreating: false,
     cryptomusUrl: null,
     cryptomusInvoiceId: null,
+    cryptomusWalletAddress: null,
+    cryptomusNetwork: null,
+    cryptomusPaymentAmount: null,
     cryptomusError: null,
+
+    cryptomusStatus: null,
+    cryptomusStatusData: null,
 }
 
 const topupReducer = (state = initialState, action: any): TopupState => {
@@ -114,13 +126,27 @@ const topupReducer = (state = initialState, action: any): TopupState => {
 
         // Cryptomus Deposit
         case types.CREATE_CRYPTOMUS_INVOICE_REQUEST:
-            return { ...state, cryptomusCreating: true, cryptomusError: null, cryptomusUrl: null, cryptomusInvoiceId: null }
+            return { ...state, cryptomusCreating: true, cryptomusError: null, cryptomusUrl: null, cryptomusInvoiceId: null, cryptomusWalletAddress: null, cryptomusNetwork: null, cryptomusPaymentAmount: null }
         case types.CREATE_CRYPTOMUS_INVOICE_SUCCESS:
-            return { ...state, cryptomusCreating: false, cryptomusUrl: action.payload.url, cryptomusInvoiceId: action.payload.invoiceId }
+            return { ...state, cryptomusCreating: false, cryptomusUrl: action.payload.url, cryptomusInvoiceId: action.payload.invoiceId, cryptomusWalletAddress: action.payload.walletAddress || null, cryptomusNetwork: action.payload.network || null, cryptomusPaymentAmount: action.payload.paymentAmount || null }
         case types.CREATE_CRYPTOMUS_INVOICE_FAILURE:
             return { ...state, cryptomusCreating: false, cryptomusError: action.payload }
         case types.RESET_CRYPTOMUS_STATUS:
-            return { ...state, cryptomusCreating: false, cryptomusUrl: null, cryptomusInvoiceId: null, cryptomusError: null }
+            return { ...state, cryptomusCreating: false, cryptomusUrl: null, cryptomusInvoiceId: null, cryptomusWalletAddress: null, cryptomusNetwork: null, cryptomusPaymentAmount: null, cryptomusError: null, cryptomusStatus: null, cryptomusStatusData: null }
+
+        // Cryptomus Payment Polling
+        case types.POLL_CRYPTOMUS_STATUS_START:
+            return { ...state, cryptomusStatus: 'pending' }
+        case types.POLL_CRYPTOMUS_STATUS_UPDATE:
+            return { ...state, cryptomusStatus: action.payload.status, cryptomusStatusData: action.payload.data }
+        case types.POLL_CRYPTOMUS_PAYMENT_DETAILS:
+            return {
+                ...state,
+                cryptomusWalletAddress: action.payload.address || state.cryptomusWalletAddress,
+                cryptomusNetwork: action.payload.network || state.cryptomusNetwork,
+            }
+        case types.POLL_CRYPTOMUS_STATUS_STOP:
+            return { ...state, cryptomusStatus: null, cryptomusStatusData: null }
 
         default:
             return state

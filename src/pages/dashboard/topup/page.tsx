@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useSearchParams } from 'react-router-dom'
 import { Link } from 'react-router-dom'
 import {
@@ -15,13 +15,15 @@ import {
   Gift,
   Zap,
   CreditCard,
-  ExternalLink,
   TrendingUp,
   History,
   ArrowDown,
   ArrowUp,
   Landmark,
   ArrowLeft,
+  XCircle,
+  Search,
+  ChevronDown,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -35,13 +37,12 @@ import {
   fetchHistoryRequest,
   createCryptomusInvoiceRequest,
   resetCryptomusStatus,
+  startCryptomusPolling,
+  stopCryptomusPolling,
 } from "@/modules/topup/actions"
-import payBtc from "@/assets/pay-btc.svg"
-import payEth from "@/assets/pay-eth.svg"
-import payUsdt from "@/assets/pay-usdt.svg"
-import payUsdc from "@/assets/pay-usdc.svg"
-import payCard from "@/assets/pay-card.svg"
-import payApplePay from "@/assets/pay-applepay.svg"
+import { fetchCryptoConfigRequest } from "@/modules/crypto/actions"
+import { CryptoIcon } from "@/components/CryptoIcon"
+import { QRCodeSVG } from 'qrcode.react'
 
 // ─── Credit Packages ───
 const creditPackages = [
@@ -457,31 +458,107 @@ function HistoryTab() {
   )
 }
 
-// ─── Cryptomus Deposit Tab ───
+// ─── Cryptomus Deposit Tab (Binance-style) ───
 const depositAmounts = [25, 50, 100, 250, 500]
 
 function CryptomusDepositTab() {
   const dispatch = useDispatch()
-  const { cryptomusCreating, cryptomusUrl, cryptomusInvoiceId, cryptomusError } = useSelector(
-    (state: RootState) => state.topup
+  const {
+    cryptomusCreating, cryptomusUrl, cryptomusInvoiceId, cryptomusError,
+    cryptomusStatus, cryptomusWalletAddress, cryptomusNetwork, cryptomusPaymentAmount,
+  } = useSelector((state: RootState) => state.topup)
+  const { configs: cryptoConfigs, loading: configsLoading } = useSelector(
+    (state: RootState) => state.crypto
   )
 
+  const [selectedCoin, setSelectedCoin] = useState<string | null>(null)
+  const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null)
+  const [coinSearch, setCoinSearch] = useState('')
+  const [networkSearch, setNetworkSearch] = useState('')
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [networkOpen, setNetworkOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const networkRef = useRef<HTMLDivElement>(null)
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null)
   const [customAmount, setCustomAmount] = useState('')
   const [isVisible, setIsVisible] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [expiryTime, setExpiryTime] = useState<number | null>(null)
+  const [countdown, setCountdown] = useState('')
 
   useEffect(() => {
     const t = setTimeout(() => setIsVisible(true), 100)
     return () => clearTimeout(t)
   }, [])
 
+  // Fetch crypto configs on mount
+  useEffect(() => {
+    dispatch(fetchCryptoConfigRequest())
+  }, [dispatch])
+
   // Reset status when navigating away
   useEffect(() => {
     return () => {
+      dispatch(stopCryptomusPolling())
       dispatch(resetCryptomusStatus())
     }
   }, [dispatch])
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false)
+      }
+      if (networkRef.current && !networkRef.current.contains(e.target as Node)) {
+        setNetworkOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  // Start polling when invoice is created
+  useEffect(() => {
+    if (cryptomusInvoiceId) {
+      const expiry = Date.now() + 24 * 60 * 60 * 1000
+      setExpiryTime(expiry)
+      dispatch(startCryptomusPolling(cryptomusInvoiceId))
+    }
+  }, [cryptomusInvoiceId, dispatch])
+
+  // Expiry countdown
+  useEffect(() => {
+    if (!expiryTime) return
+    const tick = () => {
+      const remaining = Math.max(0, expiryTime - Date.now())
+      if (remaining <= 0) {
+        setCountdown('Expired')
+        return
+      }
+      const h = Math.floor(remaining / 3600000)
+      const m = Math.floor((remaining % 3600000) / 60000)
+      const s = Math.floor((remaining % 60000) / 1000)
+      setCountdown(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`)
+    }
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [expiryTime])
+
+  const activeConfigs = cryptoConfigs.filter((c: any) => c.isActive)
+  const selectedCoinConfig = activeConfigs.find((c: any) => c.id === selectedCoin)
+  const activeNetworks = (selectedCoinConfig?.networks || []).filter((n: any) => n.isActive)
+
+  // Auto-select first coin + first network on load
+  useEffect(() => {
+    if (!selectedCoin && activeConfigs.length > 0) {
+      const first = activeConfigs[0]
+      setSelectedCoin(first.id)
+      const nets = (first.networks || []).filter((n: any) => n.isActive)
+      if (nets.length > 0) setSelectedNetwork(nets[0].id)
+    }
+  }, [activeConfigs, selectedCoin])
 
   const getEffectiveAmount = () => {
     if (customAmount) return parseFloat(customAmount)
@@ -491,15 +568,151 @@ function CryptomusDepositTab() {
   const handleDeposit = () => {
     const amount = getEffectiveAmount()
     if (amount <= 0) return
-    dispatch(createCryptomusInvoiceRequest({ amount }))
+    const needsNetwork = activeNetworks.length > 0 && !selectedNetwork
+    if (needsNetwork) return
+    dispatch(createCryptomusInvoiceRequest({ amount, currency: selectedCoinConfig?.name, network: selectedNetwork }))
   }
 
-  const handleCopyLink = () => {
-    if (cryptomusUrl) {
-      navigator.clipboard.writeText(cryptomusUrl)
+  const canDeposit = () => {
+    if (getEffectiveAmount() <= 0) return false
+    if (activeNetworks.length > 0 && !selectedNetwork) return false
+    return true
+  }
+
+  const handleCopyAddress = () => {
+    const text = cryptomusWalletAddress || cryptomusUrl
+    if (text) {
+      navigator.clipboard.writeText(text)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
+  }
+
+  const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
+    pending: { label: 'Awaiting Payment', color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },
+    paid: { label: 'Payment Completed', color: 'text-green-400', bg: 'bg-green-500/10 border-green-500/20' },
+    expired: { label: 'Expired', color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20' },
+    failed: { label: 'Failed', color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20' },
+  }
+
+  const currentStatus = cryptomusStatus ? statusConfig[cryptomusStatus] : null
+
+  // Invoice created view — inline payment with QR code
+  if (cryptomusInvoiceId) {
+    return (
+      <div className={cn("transition-all duration-500", isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4")}>
+        <div className="max-w-xl mx-auto space-y-5">
+          {/* Status Banner */}
+          <div className={cn("rounded-2xl border p-6 text-center", currentStatus?.bg || "bg-amber-500/10 border-amber-500/20")}>
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-secondary/50 flex items-center justify-center">
+              {cryptomusStatus === 'paid' ? (
+                <CheckCircle2 className="w-8 h-8 text-green-400" />
+              ) : cryptomusStatus === 'expired' || cryptomusStatus === 'failed' ? (
+                <XCircle className="w-8 h-8 text-red-400" />
+              ) : (
+                <Clock className="w-8 h-8 text-amber-400 animate-pulse" />
+              )}
+            </div>
+            <h3 className="text-xl font-bold mb-1">
+              {currentStatus?.label || 'Awaiting Payment'}
+            </h3>
+            <p className="text-sm text-muted-foreground mb-1">
+              Invoice #{cryptomusInvoiceId?.slice(0, 12)}...
+            </p>
+            {cryptomusPaymentAmount && (
+              <p className="text-sm text-muted-foreground mb-4">
+                Amount: <span className="font-semibold text-foreground">${cryptomusPaymentAmount.toFixed(2)}</span>
+              </p>
+            )}
+
+            {/* Countdown */}
+            {countdown && cryptomusStatus !== 'paid' && cryptomusStatus !== 'expired' && cryptomusStatus !== 'failed' && (
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary/50 text-sm font-mono">
+                <Clock className="w-4 h-4 text-muted-foreground" />
+                <span>Expires in {countdown}</span>
+              </div>
+            )}
+
+            {cryptomusStatus === 'paid' && (
+              <p className="text-sm text-green-400 mt-3">Funds have been credited to your balance!</p>
+            )}
+          </div>
+
+          {/* QR Code + Payment Info — show while pending */}
+          {cryptomusStatus !== 'paid' && cryptomusStatus !== 'expired' && cryptomusStatus !== 'failed' && (
+            <div className="rounded-2xl bg-card border border-border p-6 space-y-5">
+              {/* QR Code — wallet address if available, otherwise payment URL */}
+              {(cryptomusWalletAddress || cryptomusUrl) && (
+                <div className="flex justify-center">
+                  <div className="p-4 bg-white rounded-2xl">
+                    <QRCodeSVG
+                      value={cryptomusWalletAddress || cryptomusUrl || ''}
+                      size={180}
+                      level="M"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Network Badge */}
+              {cryptomusNetwork && (
+                <div className="flex justify-center">
+                  <span className="text-xs font-semibold px-3 py-1 rounded-full bg-primary/10 text-primary">
+                    {cryptomusNetwork.toUpperCase()}
+                  </span>
+                </div>
+              )}
+
+              {/* Address / Link */}
+              <div>
+                <p className="text-xs text-muted-foreground mb-2 text-center">
+                  {cryptomusWalletAddress ? 'Send to this address' : 'Scan QR to pay'}
+                </p>
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-secondary/50 border border-border">
+                  <code className="flex-1 text-xs font-mono break-all text-foreground">
+                    {cryptomusWalletAddress || cryptomusUrl}
+                  </code>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopyAddress}
+                    className="h-8 rounded-lg gap-1.5 shrink-0"
+                  >
+                    {copied ? (
+                      <><CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> Copied</>
+                    ) : (
+                      <><Copy className="w-3.5 h-3.5" /> Copy</>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <p className="text-xs text-muted-foreground text-center">
+                {cryptomusPaymentAmount != null && (
+                  <>Send exactly <span className="font-semibold text-foreground">${cryptomusPaymentAmount.toFixed(2)}</span>{cryptomusWalletAddress ? ' to the address above. ' : '. '}</>
+                )}
+                Your payment will be detected automatically.
+              </p>
+            </div>
+          )}
+
+          {/* Back button — only show if not paid */}
+          {cryptomusStatus !== 'paid' && (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                dispatch(stopCryptomusPolling())
+                dispatch(resetCryptomusStatus())
+              }}
+              className="h-10 rounded-xl text-sm w-full"
+            >
+              <ArrowLeft className="w-4 h-4 mr-1" />
+              Make a different deposit
+            </Button>
+          )}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -507,10 +720,240 @@ function CryptomusDepositTab() {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Main Deposit Card */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Coin Selection — Binance-style Dropdown */}
+          <div className="rounded-2xl bg-card border border-border p-6">
+            <h3 className="font-semibold text-lg mb-1">Select Cryptocurrency</h3>
+            <p className="text-sm text-muted-foreground mb-4">Choose a coin to deposit with CryptoMus</p>
+
+            {configsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : (
+              <div className="relative" ref={dropdownRef}>
+                {/* Trigger */}
+                <button
+                  type="button"
+                  onClick={() => { setDropdownOpen(!dropdownOpen); setCoinSearch('') }}
+                  className="w-full flex items-center gap-3 h-14 px-4 rounded-xl bg-secondary/50 border border-border hover:border-primary/30 transition-colors text-left"
+                >
+                  {selectedCoin ? (
+                    (() => {
+                      const coin = activeConfigs.find((c: any) => c.id === selectedCoin)
+                      if (!coin) return <span className="text-muted-foreground">Select coin</span>
+                      return (
+                        <>
+                          <CryptoIcon coinId={coin.id} className="w-7 h-7" color={coin.color} bg={coin.bg} name={coin.name} />
+                          <div className="flex-1">
+                            <span className="text-sm font-semibold block">{coin.name}</span>
+                            <span className="text-[10px] text-muted-foreground">{coin.fullName}</span>
+                          </div>
+                        </>
+                      )
+                    })()
+                  ) : (
+                    <>
+                      <Coins className="w-5 h-5 text-muted-foreground" />
+                      <span className="text-muted-foreground text-sm">Select coin</span>
+                    </>
+                  )}
+                  <ChevronDown className={cn("w-4 h-4 text-muted-foreground ml-auto transition-transform", dropdownOpen && "rotate-180")} />
+                </button>
+
+                {/* Dropdown */}
+                {dropdownOpen && (
+                  <div className="absolute z-50 mt-2 w-full rounded-xl bg-card border border-border shadow-2xl overflow-hidden">
+                    {/* Search inside dropdown */}
+                    <div className="relative p-3 border-b border-border">
+                      <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        type="text"
+                        value={coinSearch}
+                        onChange={(e) => setCoinSearch(e.target.value)}
+                        placeholder="Search coins..."
+                        autoFocus
+                        className="w-full h-10 pl-9 pr-4 rounded-lg bg-secondary/50 border border-border focus:border-primary/50 focus:outline-none text-sm"
+                      />
+                    </div>
+
+                    {/* Coin List */}
+                    <div className="max-h-72 overflow-y-auto p-2">
+                      {(() => {
+                        const filtered = activeConfigs.filter((c: any) => {
+                          if (!coinSearch.trim()) return true
+                          const q = coinSearch.toLowerCase()
+                          return c.name.toLowerCase().includes(q) || c.fullName.toLowerCase().includes(q) || c.id.toLowerCase().includes(q)
+                        })
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="text-center py-6 text-muted-foreground text-sm">
+                              No coins match "{coinSearch}"
+                            </div>
+                          )
+                        }
+                        return filtered.map((coin: any) => {
+                          const activeNets = (coin.networks || []).filter((n: any) => n.isActive)
+                          return (
+                            <button
+                              key={coin.id}
+                              onClick={() => {
+                                setSelectedCoin(coin.id)
+                                setDropdownOpen(false)
+                                setCoinSearch('')
+                                const nets = (coin.networks || []).filter((n: any) => n.isActive)
+                                setSelectedNetwork(nets.length > 0 ? nets[0].id : null)
+                              }}
+                              className={cn(
+                                "w-full flex items-center gap-3 p-3 rounded-lg transition-colors hover:bg-secondary/50 text-left",
+                                selectedCoin === coin.id && "bg-primary/10 border border-primary/20"
+                              )}
+                            >
+                              <CryptoIcon coinId={coin.id} className="w-7 h-7" color={coin.color} bg={coin.bg} name={coin.name} />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-semibold">{coin.name}</span>
+                                  {activeNets.length > 0 && (
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                                      {activeNets.length} network{activeNets.length > 1 ? 's' : ''}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-muted-foreground">{coin.fullName}</span>
+                              </div>
+                              {selectedCoin === coin.id && <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />}
+                            </button>
+                          )
+                        })
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Network Selection — Binance-style Dropdown */}
+          {selectedCoin && activeNetworks.length > 0 ? (
+            <div className="rounded-2xl bg-card border border-border p-6">
+              <h3 className="font-semibold text-lg mb-1">Select Network</h3>
+              <p className="text-sm text-muted-foreground mb-4">Choose a network for your deposit</p>
+
+              <div className="relative" ref={networkRef}>
+                {/* Trigger */}
+                <button
+                  type="button"
+                  onClick={() => { setNetworkOpen(!networkOpen); setNetworkSearch('') }}
+                  className="w-full flex items-center gap-3 h-14 px-4 rounded-xl bg-secondary/50 border border-border hover:border-primary/30 transition-colors text-left"
+                >
+                  {selectedNetwork ? (
+                    (() => {
+                      const net = activeNetworks.find((n: any) => n.id === selectedNetwork)
+                      if (!net) return <span className="text-muted-foreground">Select network</span>
+                      return (
+                        <>
+                          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-xs font-bold text-primary">{net.id.slice(0, 2).toUpperCase()}</span>
+                          </div>
+                          <div className="flex-1">
+                            <span className="text-sm font-semibold block">{net.name}</span>
+                            <span className="text-[10px] text-muted-foreground">Fee: {net.fee} · {net.time}</span>
+                          </div>
+                        </>
+                      )
+                    })()
+                  ) : (
+                    <>
+                      <Landmark className="w-5 h-5 text-muted-foreground" />
+                      <span className="text-muted-foreground text-sm">Select network</span>
+                    </>
+                  )}
+                  <ChevronDown className={cn("w-4 h-4 text-muted-foreground ml-auto transition-transform", networkOpen && "rotate-180")} />
+                </button>
+
+                {/* Dropdown */}
+                {networkOpen && (
+                  <div className="absolute z-50 mt-2 w-full rounded-xl bg-card border border-border shadow-2xl overflow-hidden">
+                    <div className="relative p-3 border-b border-border">
+                      <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        type="text"
+                        value={networkSearch}
+                        onChange={(e) => setNetworkSearch(e.target.value)}
+                        placeholder="Search networks..."
+                        autoFocus
+                        className="w-full h-10 pl-9 pr-4 rounded-lg bg-secondary/50 border border-border focus:border-primary/50 focus:outline-none text-sm"
+                      />
+                    </div>
+
+                    <div className="max-h-72 overflow-y-auto p-2">
+                      {(() => {
+                        const filtered = activeNetworks.filter((n: any) => {
+                          if (!networkSearch.trim()) return true
+                          const q = networkSearch.toLowerCase()
+                          return n.name.toLowerCase().includes(q) || n.id.toLowerCase().includes(q)
+                        })
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="text-center py-6 text-muted-foreground text-sm">
+                              No networks match "{networkSearch}"
+                            </div>
+                          )
+                        }
+                        return filtered.map((net: any) => (
+                          <button
+                            key={net.id}
+                            onClick={() => {
+                              setSelectedNetwork(net.id)
+                              setNetworkOpen(false)
+                              setNetworkSearch('')
+                            }}
+                            className={cn(
+                              "w-full flex items-center gap-3 p-3 rounded-lg transition-colors hover:bg-secondary/50 text-left",
+                              selectedNetwork === net.id && "bg-primary/10 border border-primary/20"
+                            )}
+                          >
+                            <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                              <span className="text-xs font-bold text-primary">{net.id.slice(0, 2).toUpperCase()}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold">{net.name}</span>
+                                {net.badge && (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded font-medium bg-blue-500/10 text-blue-500">
+                                    {net.badge}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                                <span>Fee: {net.fee}</span>
+                                <span>·</span>
+                                <span>{net.time}</span>
+                                <span>·</span>
+                                <span>Min: {net.minDeposit}</span>
+                              </div>
+                            </div>
+                            {selectedNetwork === net.id && <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />}
+                          </button>
+                        ))
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : selectedCoin ? (
+            <div className="rounded-2xl bg-amber-500/5 border border-amber-500/20 p-4">
+              <p className="text-sm text-amber-400 flex items-center gap-2">
+                <Shield className="w-4 h-4" />
+                No active networks configured for {selectedCoinConfig?.name}. Contact support.
+              </p>
+            </div>
+          ) : null}
+
           {/* Amount Selection */}
           <div className="rounded-2xl bg-card border border-border p-6">
-            <h3 className="font-semibold text-lg mb-1">Deposit Funds</h3>
-            <p className="text-sm text-muted-foreground mb-6">Choose an amount to deposit</p>
+            <h3 className="font-semibold text-lg mb-1">Amount</h3>
+            <p className="text-sm text-muted-foreground mb-6">Enter the amount you want to deposit</p>
 
             {/* Preset Amounts */}
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 mb-4">
@@ -550,13 +993,17 @@ function CryptomusDepositTab() {
               />
             </div>
 
-            {/* Divider */}
+            {/* Summary */}
             <div className="h-px bg-border my-6" />
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm text-muted-foreground">You will deposit</span>
+              <span className="text-xl font-bold">${getEffectiveAmount().toFixed(2)}</span>
+            </div>
 
             {/* Deposit Button */}
             <Button
               onClick={handleDeposit}
-              disabled={cryptomusCreating || getEffectiveAmount() <= 0}
+              disabled={cryptomusCreating || !canDeposit()}
               className="w-full h-14 rounded-xl text-base font-semibold gap-2"
             >
               {cryptomusCreating ? (
@@ -580,81 +1027,45 @@ function CryptomusDepositTab() {
               </div>
             )}
           </div>
-
-          {/* Payment Success / Waiting State */}
-          {cryptomusUrl && (
-            <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
-                  <ExternalLink className="w-6 h-6 text-green-500" />
-                </div>
-                <div>
-                  <h3 className="font-semibold">Payment Window Opened</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Invoice #{cryptomusInvoiceId?.slice(0, 8)}... — Complete payment in the opened tab
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Button
-                  variant="outline"
-                  onClick={handleCopyLink}
-                  className="h-11 rounded-xl gap-2 flex-1"
-                >
-                  {copied ? (
-                    <><CheckCircle2 className="w-4 h-4 text-green-500" /> Copied!</>
-                  ) : (
-                    <><Copy className="w-4 h-4" /> Copy Payment Link</>
-                  )}
-                </Button>
-                <Button
-                  onClick={() => window.open(cryptomusUrl, '_blank')}
-                  className="h-11 rounded-xl gap-2 flex-1"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  Open Payment Page
-                </Button>
-              </div>
-
-              <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-sm">
-                <Clock className="w-4 h-4 text-amber-500 shrink-0" />
-                <span className="text-amber-600 dark:text-amber-400">
-                  Payment pending. Funds will be credited automatically once confirmed by the network.
-                </span>
-              </div>
-
-              <Button
-                variant="ghost"
-                onClick={() => dispatch(resetCryptomusStatus())}
-                className="h-10 rounded-xl text-sm"
-              >
-                <ArrowLeft className="w-4 h-4 mr-1" />
-                Make a different deposit
-              </Button>
-            </div>
-          )}
         </div>
 
         {/* Sidebar */}
         <div className="space-y-4">
-          {/* Supported Methods */}
+          {/* Available Coins List */}
           <div className="rounded-2xl bg-card border border-border p-5">
-            <h4 className="font-semibold text-sm mb-3">Accepted Payment Methods</h4>
-            <div className="space-y-2.5">
-              {[
-                { label: 'Bitcoin (BTC)', icon: payBtc },
-                { label: 'Ethereum (ETH)', icon: payEth },
-                { label: 'USDT (TRC-20)', icon: payUsdt },
-                { label: 'USDC', icon: payUsdc },
-                { label: 'Visa / Mastercard', icon: payCard },
-                { label: 'Apple Pay / Google Pay', icon: payApplePay },
-              ].map((method) => (
-                <div key={method.label} className="flex items-center gap-2.5">
-                  <img src={method.icon} alt={method.label} className="w-5 h-5 rounded-full" />
-                  <span className="text-sm">{method.label}</span>
+            <h4 className="font-semibold text-sm mb-3">Available Coins</h4>
+            <div className="space-y-1">
+              {configsLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                 </div>
-              ))}
+              ) : activeConfigs.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-2">No coins available</p>
+              ) : (
+                activeConfigs.map((coin: any) => (
+                  <button
+                    key={coin.id}
+                    onClick={() => {
+                      setSelectedCoin(coin.id)
+                      const nets = (coin.networks || []).filter((n: any) => n.isActive)
+                      setSelectedNetwork(nets.length > 0 ? nets[0].id : null)
+                    }}
+                    className={cn(
+                      "w-full flex items-center gap-2.5 p-2.5 rounded-lg transition-colors hover:bg-secondary/50",
+                      selectedCoin === coin.id && "bg-primary/10 border border-primary/20"
+                    )}
+                  >
+                    <div className="w-6 h-6 rounded-full bg-secondary/50 flex items-center justify-center overflow-hidden">
+                      <CryptoIcon coinId={coin.id} className="w-5 h-5" color={coin.color} bg={coin.bg} name={coin.name} />
+                    </div>
+                    <div className="text-left">
+                      <span className="text-sm font-medium">{coin.name}</span>
+                      <span className="text-[10px] text-muted-foreground block">{coin.fullName}</span>
+                    </div>
+                    {selectedCoin === coin.id && <CheckCircle2 className="w-4 h-4 text-primary ml-auto" />}
+                  </button>
+                ))
+              )}
             </div>
           </div>
 
@@ -663,10 +1074,10 @@ function CryptomusDepositTab() {
             <h4 className="font-semibold text-sm mb-3">Why Deposit?</h4>
             <div className="space-y-2.5">
               {[
-                'Instant confirmation for most coins',
-                'Competitive exchange rates',
-                'Widely accepted worldwide',
+                'Supports multiple cryptocurrencies',
+                'Secure Cryptomus payment gateway',
                 'Automatic credit to your balance',
+                '24/7 support available',
               ].map((item, i) => (
                 <div key={i} className="flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
@@ -676,7 +1087,7 @@ function CryptomusDepositTab() {
             </div>
           </div>
 
-          {/* Support Card */}
+          {/* Need Help */}
           <div className="rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border border-primary/20 p-5">
             <h4 className="font-semibold text-sm mb-1">Need Help?</h4>
             <p className="text-xs text-muted-foreground mb-3">
