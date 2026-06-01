@@ -31,7 +31,7 @@ export function Header({ onMenuToggle }: HeaderProps = {}) {
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
         {/* Top bar with logo and navigation */}
         <div className="flex items-center justify-between h-16">
-          {/* Left Side: Logo + Extensions */}
+          {/* Left Side: Logo + TG Group */}
           <div className="flex items-center gap-4">
             <Link to="/" className="flex items-center gap-3 group">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-primary/10 overflow-hidden transition-all duration-300 group-hover:scale-105">
@@ -41,16 +41,18 @@ export function Header({ onMenuToggle }: HeaderProps = {}) {
                 Captcha<span className="text-primary">Ɱaster</span>
               </span>
             </Link>
-            {/* Extensions - Direct Google Drive Link */}
+            {/* Telegram Group */}
             <a
-              href={EXTENSIONS_DRIVE_URL}
+              href="https://t.me/CaptchaMasterBangladesh"
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden md:flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors"
+              className="hidden md:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-muted-foreground hover:text-[#2AABEE] hover:bg-[#2AABEE]/5 transition-colors"
+              title="Join Telegram Group"
             >
-              <Puzzle className="w-4 h-4 text-foreground" />
-              <span className="text-sm font-medium text-foreground hidden lg:inline">Extensions</span>
-              <ExternalLink className="w-3 h-3 text-muted-foreground" />
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161c-.18 1.897-.962 6.502-1.359 8.627-.168.9-.5 1.201-.82 1.23-.697.064-1.226-.46-1.901-.903-1.056-.692-1.653-1.123-2.678-1.799-1.185-.781-.417-1.21.258-1.911.177-.184 3.247-2.977 3.307-3.23.007-.032.015-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.139-5.062 3.345-.479.329-.913.489-1.302.481-.428-.009-1.252-.242-1.865-.441-.752-.244-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.831-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635.099-.002.321.023.465.14.121.099.155.233.17.33.016.099.036.324.02.499z"/>
+              </svg>
+              <span className="text-xs font-medium">Join TG Group</span>
             </a>
           </div>
 
@@ -58,6 +60,18 @@ export function Header({ onMenuToggle }: HeaderProps = {}) {
           <div className="flex-1 flex items-center justify-end gap-6 transition-all duration-300">
             {/* Center Navigation Group */}
             <div className="hidden md:flex items-center gap-3">
+              {/* Extensions - Direct Google Drive Link */}
+              <a
+                href={EXTENSIONS_DRIVE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors"
+              >
+                <Puzzle className="w-4 h-4 text-foreground" />
+                <span className="text-sm font-medium text-foreground hidden lg:inline">Extensions</span>
+                <ExternalLink className="w-3 h-3 text-muted-foreground" />
+              </a>
+
               {/* API Library */}
               <Link to="/api-docs" className="hidden md:flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors">
                 <Code className="w-4 h-4 text-foreground" />
@@ -93,18 +107,6 @@ export function Header({ onMenuToggle }: HeaderProps = {}) {
                   <Gift className="w-5 h-5" />
                 </Button>
               </Link>
-              <a
-                href="https://t.me/CaptchaMasterBangladesh"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-2 py-1.5 rounded-xl text-muted-foreground hover:text-[#2AABEE] hover:bg-[#2AABEE]/5 transition-colors"
-                title="Join Telegram Group"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161c-.18 1.897-.962 6.502-1.359 8.627-.168.9-.5 1.201-.82 1.23-.697.064-1.226-.46-1.901-.903-1.056-.692-1.653-1.123-2.678-1.799-1.185-.781-.417-1.21.258-1.911.177-.184 3.247-2.977 3.307-3.23.007-.032.015-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.139-5.062 3.345-.479.329-.913.489-1.302.481-.428-.009-1.252-.242-1.865-.441-.752-.244-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.831-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635.099-.002.321.023.465.14.121.099.155.233.17.33.016.099.036.324.02.499z"/>
-                </svg>
-                <span className="text-xs font-medium">Join TG Group</span>
-              </a>
               <Button
                 variant="ghost"
                 size="icon"
