@@ -459,7 +459,7 @@ function HistoryTab() {
 }
 
 // ─── Cryptomus Deposit Tab (Binance-style) ───
-const depositAmounts = [25, 50, 100, 250, 500]
+const depositAmounts = [2, 5, 10, 25, 50, 100]
 
 function CryptomusDepositTab() {
   const dispatch = useDispatch()
@@ -562,7 +562,7 @@ function CryptomusDepositTab() {
 
   const getEffectiveAmount = () => {
     if (customAmount) return parseFloat(customAmount)
-    return selectedAmount ?? 25
+    return selectedAmount ?? 0
   }
 
   const handleDeposit = () => {
@@ -956,7 +956,7 @@ function CryptomusDepositTab() {
             <p className="text-sm text-muted-foreground mb-6">Enter the amount you want to deposit</p>
 
             {/* Preset Amounts */}
-            <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 mb-4">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mb-4">
               {depositAmounts.map((amount) => (
                 <button
                   key={amount}
@@ -986,7 +986,7 @@ function CryptomusDepositTab() {
                   setCustomAmount(e.target.value)
                   setSelectedAmount(null)
                 }}
-                placeholder="Custom amount"
+                placeholder="Enter amount"
                 min="1"
                 step="0.01"
                 className="w-full h-14 pl-10 pr-4 rounded-xl bg-secondary/50 border border-border focus:border-primary/50 focus:outline-none text-lg font-semibold"
@@ -1001,23 +1001,27 @@ function CryptomusDepositTab() {
             </div>
 
             {/* Deposit Button */}
-            <Button
-              onClick={handleDeposit}
-              disabled={cryptomusCreating || !canDeposit()}
-              className="w-full h-14 rounded-xl text-base font-semibold gap-2"
-            >
-              {cryptomusCreating ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Creating Invoice...
-                </>
-              ) : (
-                <>
-                  <Landmark className="w-5 h-5" />
-                  Deposit ${getEffectiveAmount().toFixed(2)}
-                </>
-              )}
-            </Button>
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-primary via-purple-500 to-primary rounded-xl blur-md opacity-50 group-hover:opacity-80 transition-opacity duration-300" />
+              <Button
+                onClick={handleDeposit}
+                disabled={cryptomusCreating || !canDeposit()}
+                className="relative w-full h-14 rounded-xl text-base font-semibold gap-2 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-500 text-white shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100"
+              >
+                {cryptomusCreating ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Creating Invoice...
+                  </>
+                ) : (
+                  <>
+                    <Landmark className="w-5 h-5" />
+                    Deposit ${getEffectiveAmount().toFixed(2)}
+                    <ArrowUpRight className="w-4 h-4" />
+                  </>
+                )}
+              </Button>
+            </div>
 
             {/* Error */}
             {cryptomusError && (

@@ -1,12 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Clock, RefreshCw, AlertTriangle, Bell, User, MoreVertical, Puzzle, ArrowUpRight, Download, Code, Wallet, Loader2, Gift, LogOut, Shield, LayoutDashboard } from "lucide-react"
+import { Bell, User, MoreVertical, Puzzle, Code, Wallet, Loader2, Gift, LogOut, Shield, LayoutDashboard, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Link } from 'react-router-dom'
-import { useDispatch, useSelector } from "react-redux"
+import { useSelector } from "react-redux"
 import { RootState } from "@/modules/rootReducer"
-import { fetchDashboardDataRequest, fetchExtensionsRequest } from "@/modules/dashboard/actions"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,22 +18,13 @@ interface HeaderProps {
   onMenuToggle?: () => void
 }
 
-export function Header({ onMenuToggle }: HeaderProps = {}) {
-  const dispatch = useDispatch()
+const EXTENSIONS_DRIVE_URL = "https://drive.google.com/drive/folders/1fHPVBksUzNS5aXPZJtjtmg0jGcVzi-Rx"
 
-  const { userData, loading: isLoadingBalance, extensions } = useSelector((state: RootState) => state.dashboard)
+export function Header({ onMenuToggle }: HeaderProps = {}) {
+  const { userData, loading: isLoadingBalance } = useSelector((state: RootState) => state.dashboard)
   const balance = userData?.balance || 0
 
   const isAdmin = userData?.role === "admin"
-
- 
-  useEffect(() => {
-  
-      dispatch(fetchExtensionsRequest())
-   
-  }, [  dispatch])
-
- 
 
   return (
     <header className="w-full border-b border-border bg-card/80 backdrop-blur-md sticky top-0 z-50">
@@ -58,47 +47,17 @@ export function Header({ onMenuToggle }: HeaderProps = {}) {
           <div className="flex-1 flex items-center justify-end gap-6 transition-all duration-300">
             {/* Center Navigation Group */}
             <div className="hidden md:flex items-center gap-3">
-              {/* Extensions with Dropdown */}
-              <div className="relative group">
-                <button className="flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors group">
-                  <Puzzle className="w-4 h-4 text-foreground" />
-                  <span className="text-sm font-medium text-foreground hidden lg:inline">Extensions</span>
-                  <ArrowUpRight className="w-3 h-3 text-muted-foreground group-hover:rotate-45 transition-transform" />
-                </button>
-
-                {/* Dropdown Menu */}
-                <div className="absolute top-full right-0 mt-2 w-64 p-2 rounded-xl bg-card border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 shadow-xl overflow-hidden">
-                  <div className="p-2 border-b border-border/50 bg-secondary/20 font-semibold text-[10px] text-muted-foreground uppercase tracking-wider">
-                    Available Extensions
-                  </div>
-                  {extensions.length === 0 && (
-                    <div className="p-4 text-center text-xs text-muted-foreground">
-                      No extensions available
-                    </div>
-                  )}
-                  {extensions.map((extension: any) => {
-                    return (
-                      <Link
-                        key={extension._id.toString()}
-                        to={extension.downloadUrl}
-                        className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary transition-colors"
-                      >
-                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center overflow-hidden flex-shrink-0">
-                          {extension.iconUrl ? (
-                            <img src={extension.iconUrl} alt={extension.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <Download className="w-4 h-4 text-primary" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{extension.name}</p>
-                          <p className="text-[11px] text-muted-foreground line-clamp-1">v{extension.version} • {extension.platform}</p>
-                        </div>
-                      </Link>
-                    )
-                  })}
-                </div>
-              </div>
+              {/* Extensions - Direct Google Drive Link */}
+              <a
+                href={EXTENSIONS_DRIVE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors"
+              >
+                <Puzzle className="w-4 h-4 text-foreground" />
+                <span className="text-sm font-medium text-foreground hidden lg:inline">Extensions</span>
+                <ExternalLink className="w-3 h-3 text-muted-foreground" />
+              </a>
 
               {/* API Library */}
               <Link to="/api-docs" className="hidden md:flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors">
